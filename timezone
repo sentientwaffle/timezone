@@ -1,0 +1,70 @@
+#!/usr/bin/env ruby
+
+require 'tzinfo'
+
+USAGE = <<-EOS
+
+  Usage:
+  
+    $ timezone TIME FROM-TIMEZONE [TO-TIMEZONE]
+
+  Examples:
+
+    # Convert time from one zone to another.
+    $ timezone 10:00AM PDT MST
+    
+    # Convert from one zone to the current zone.
+    $ timezone 10:00AM PDT
+
+  Source: https://github.com/sentientwaffle/timezone
+
+EOS
+
+TIMEZONES = {}
+
+# Collect the time zone abbreviations.
+TZInfo::Timezone.all.each do |tz|
+  TIMEZONES[tz.strftime("%Z")] = tz.to_s.gsub " - ", "/"
+end
+
+# Normalize daylight savings time (i.e. PST == PDT).
+TIMEZONES.keys.each do |zone|
+  TIMEZONES[zone.gsub(/^(.)S(.)$/, '\1D\2')] = TIMEZONES[zone]
+end
+
+
+# Internal: Convert `time` from one time zone to another.
+# 
+# time      - A time String, such as "10:00AM".
+# from_zone - A time zone String, such as "PST" or "US/Central".
+# to_zone   - A time zone String.
+# 
+# Examples
+# 
+#   convert "10:00AM", "PDT", "MST"
+#   # => "11:00 AM"
+# 
+# Returns String verison of the new time, formatted as "11:00 AM"
+def convert(time, from_zone, to_zone)
+  Time.new(time)
+  tz  = TZInfo::Timezone.get TIMEZONES[from_zone] || from_zone
+  tz1 = TZInfo::Timezone.get TIMEZONES[to_zone] || to_zone
+  local = tz.local_to_utc(Time.parse(time))
+  time  = tz1.utc_to_local local
+  return time.strftime "%I:%M %p"
+end
+
+
+# Convert timezones
+if ARGV.length == 3
+  time, from_zone, to_zone = ARGV
+  puts convert(time, from_zone, to_zone)
+# Convert to current zone.
+elsif ARGV.length == 2
+  time, from_zone = ARGV
+  puts convert(time, from_zone, Time.now.zone)
+else
+  puts USAGE
+end
+
+
